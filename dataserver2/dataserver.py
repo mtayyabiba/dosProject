@@ -5,15 +5,27 @@ import os, pickle
 port = 6970
 hostIp = '127.0.0.1'
 
+def list_files(startpath):
+    listFiles = []
+    for root, dirs, files in os.walk(startpath):
+        absPath = root.replace(startpath,'')
+        if absPath != '':
+            listFiles.append(absPath)
+        for f in files:
+            listFiles.append('{}/{}'.format(absPath,f))
+    return listFiles
+        
+
 def recvTh(soc):
     while 1:
         msg=soc.recv(1024).decode()
         print("command received > ",msg)
         if msg == "dirlist":
-            dirlist = os.listdir('root')
+            dirlist = list_files('root')
             soc.sendall(pickle.dumps(dirlist))
 
 def main():
+    print()
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
     s.connect((hostIp, port))
     #connection confirmation
