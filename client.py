@@ -1,12 +1,12 @@
 import socket as sc
 import threading           
-import os
+import os,pickle
 
 port = 6969
 hostIp = '127.0.0.1'
 
 def listcmds():
-    print("1. listdir : get directory listing \n")
+    print("1. dirlist : get directory listing \n")
     print("2. readfile : get file in read only mode\n")
     print("3. upfile : get file in write mode\n")
     print("4. delfile : delete a file\n")
@@ -15,7 +15,7 @@ def listcmds():
 
 def recvTh(soc):
     while 1:
-        print(soc.recv(1024).decode())
+        print(pickle.loads(soc.recv(8192)))
 
 def main():
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
@@ -35,10 +35,9 @@ def main():
             s.send(b'exit')
             s.close()
             os._exit(0)
-        else:
+        elif(inputmsg == "dirlist"):
             s.sendall(inputmsg.encode('utf-8'))
-    
-
+            print(pickle.loads(s.recv(8192)))
 
 if __name__ == "__main__":
 	main() 

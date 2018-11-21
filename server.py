@@ -1,6 +1,7 @@
 import os
 import socket as sc
 import threading
+import pickle
 
 hostIp = '127.0.0.1'
 clientPort = 6969
@@ -11,18 +12,16 @@ globalFT = {}
 
 #get directory listing from data server
 def getdirlist(soc):
-    print("sending dirlist msg to dserver")
     soc.send("dirlist".encode('utf-8'))
-    print("sent dirlist msg to dserver")
-    dirlist = soc.recv(8192).decode()
-    print(dirlist)
-    return dirlist
+    dirlist = pickle.loads(soc.recv(8192))
+    socPort = soc.getpeername()[1]
+    globalFT[socPort] = dirlist
+    print(globalFT)
 
 
-def dsConn(soc):
+def dsConnS(soc):
     #get initial directory listing 
-    print("getting initial dir list")
-    socdirList = getdirlist(soc)
+    getdirlist(soc)
     #append directory listing to global file table
     while True:
         msg = soc.recv(1024).decode()
@@ -40,21 +39,23 @@ def dSListen():
             dsConn.send(b'Connection established with name server')
             dsThreads = []
             try:
-                dsConnT = threading.Thread(target=clientConnS,kwargs={'soc':dsConn})
+                dsConnT = threading.Thread(target=dsConnS,kwargs={'soc':dsConn})
                 dsThreads.append(dsConnT)
                 dsConnT.start()
-                print("thread started")
             except:
                 print("Error: unable to start thread")
 
 
 def clientConnS(soc):
     msg = ""
-    while msg != "exit":
+    while True:
         msg = soc.recv(1024).decode()
         print(msg)
         if msg == "exit":
             soc.close()
+            break
+        elif msg == "dirlist":
+            soc.sendall(pickle.dumps(globalFT))
 
 
 def clientListen():

@@ -1,6 +1,6 @@
 import socket as sc   
 import threading  
-import os      
+import os, pickle  
           
 port = 6970
 hostIp = '127.0.0.1'
@@ -8,10 +8,10 @@ hostIp = '127.0.0.1'
 def recvTh(soc):
     while 1:
         msg=soc.recv(1024).decode()
-        print(msg)
+        print("command received > ",msg)
         if msg == "dirlist":
             dirlist = os.listdir('root')
-            soc.sendall(dirlist.encode('utf-8'))
+            soc.sendall(pickle.dumps(dirlist))
 
 def main():
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
