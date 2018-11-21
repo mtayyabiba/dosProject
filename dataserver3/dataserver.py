@@ -20,12 +20,18 @@ def recvTh(soc):
     while 1:
         msg=soc.recv(1024).decode()
         print("command received > ",msg)
+        cmd = msg.split(' ')[0]
+        print("command is ",cmd)
         if msg == "dirlist":
             dirlist = list_files('root')
             soc.sendall(pickle.dumps(dirlist))
+        elif cmd == "readfile":
+            filename = "/"+msg.split(' ')[1]
+            print("filename is ",filename)
+
+
 
 def main():
-    print()
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
     s.connect((hostIp, port))
     #connection confirmation

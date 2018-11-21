@@ -32,17 +32,26 @@ def main():
 
     while True:
         inputmsg = input(">")
-        if(inputmsg == "help"):
+        inputmsglist = inputmsg.split(' ')
+        cmd = inputmsglist[0]
+        if(cmd== "help"):
             listcmds()
-        elif(inputmsg == "exit"):
+        elif(cmd == "exit"):
             s.send(b'exit')
             s.close()
             os._exit(0)
-        elif(inputmsg == "dirlist"):
-            s.sendall(inputmsg.encode('utf-8'))
+        elif(cmd == "dirlist"):
+            s.sendall(cmd.encode('utf-8'))
+            print("waiting for directory listing...")
             dirstr= s.recv(8192).decode()
             for i in dirstr.split(','):
                 print(i)
+        elif(cmd == "readfile"):
+            s.sendall(inputmsg.encode('utf-8'))
+            print("waiting for file...")
+            rFileStr = s.recv(8192).decode()
+            print(rFileStr)
+
 
 if __name__ == "__main__":
 	main() 

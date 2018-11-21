@@ -9,12 +9,12 @@ dSPort = 6970
 clientList = {}
 dserverList = {}
 globalFT = {}
+buffSize = 8192
 
 #get directory listing from data server
-#example {36368: ['/reviews_1000-ds2.txt', '/folder2-ds2', '/folder2-ds2/folder2-2-ds2']}
 def getdirlist(soc):
     soc.send("dirlist".encode('utf-8'))
-    dirlist = pickle.loads(soc.recv(8192))
+    dirlist = pickle.loads(soc.recv(buffSize))
     socPort = soc.getpeername()[1]
     globalFT[socPort] = dirlist
     print(globalFT)
@@ -25,8 +25,8 @@ def dsConnS(soc):
     getdirlist(soc)
     #append directory listing to global file table
     while True:
-        msg = soc.recv(1024).decode()
-        print(msg)
+        msg = soc.recv(buffSize).decode()
+        print("dsConnS "+ msg)
         
 def dSListen():
     with sc.socket(sc.AF_INET, sc.SOCK_STREAM) as masterDSSocket:
@@ -46,21 +46,40 @@ def dSListen():
             except:
                 print("Error: unable to start thread")
 
+def getFileServPort(filename):
+    for f in globalFT:
+        for i in globalFT[f]:
+            if i == filename:
+                return f
+    return 0    
+
 
 def clientConnS(soc):
-    msg = ""
+    cmd = ""
     while True:
-        msg = soc.recv(1024).decode()
-        print(msg)
-        if msg == "exit":
+        cmd = soc.recv(1024).decode()
+        print(cmd)
+        if cmd == "exit":
             soc.close()
             break
-        elif msg == "dirlist":
+        elif cmd == "dirlist":
             dirmsg = ""
             for f in globalFT:
                 for i in globalFT[f]:
                     dirmsg = dirmsg +","+i
             soc.sendall(dirmsg.replace(",","",1).encode('utf-8'))
+        elif cmd.split(' ')[0] == "readfile":
+            filename = "/"+cmd.split(' ')[1]
+            print(filename)
+            servPort = getFileServPort(filename)
+            if servPort != 0:
+                print("file found on server ",servPort)
+                servSock = dserverList[servPort]
+                servSock[1].sendall(cmd.encode('utf-8'))
+                filecont = servSock[1].recv(buffSize)
+                soc.sendall(filecont.encode('utf-8'))
+            else:
+                print("file not found..")
 
 
 def clientListen():
