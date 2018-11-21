@@ -11,6 +11,7 @@ dserverList = {}
 globalFT = {}
 
 #get directory listing from data server
+#example {36368: ['/reviews_1000-ds2.txt', '/folder2-ds2', '/folder2-ds2/folder2-2-ds2']}
 def getdirlist(soc):
     soc.send("dirlist".encode('utf-8'))
     dirlist = pickle.loads(soc.recv(8192))
@@ -55,7 +56,11 @@ def clientConnS(soc):
             soc.close()
             break
         elif msg == "dirlist":
-            soc.sendall(pickle.dumps(globalFT))
+            dirmsg = ""
+            for f in globalFT:
+                for i in globalFT[f]:
+                    dirmsg = dirmsg +","+i
+            soc.sendall(dirmsg.replace(",","",1).encode('utf-8'))
 
 
 def clientListen():

@@ -13,19 +13,22 @@ def listcmds():
     print("5. mkfile : create new file\n")
 
 
-def recvTh(soc):
-    while 1:
-        print(pickle.loads(soc.recv(8192)))
+#def recvTh(soc):
+#    while 1:
+#        dirdict = pickle.loads(soc.recv(8192))
+#        for f in dirdict:
+#            for i in dirdict[f]:
+#                print(i)
 
 def main():
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
     s.connect((hostIp, port)) 
     print(s.recv(1024).decode()) 
-    try:
-        recvT = threading.Thread(target=recvTh,kwargs={'soc':s})
-        recvT.start()
-    except:
-        print("Error: unable to start thread")
+    #try:
+    #    recvT = threading.Thread(target=recvTh,kwargs={'soc':s})
+    #    recvT.start()
+    #except:
+    #    print("Error: unable to start thread")
 
     while True:
         inputmsg = input(">")
@@ -37,7 +40,9 @@ def main():
             os._exit(0)
         elif(inputmsg == "dirlist"):
             s.sendall(inputmsg.encode('utf-8'))
-            print(pickle.loads(s.recv(8192)))
+            dirstr= s.recv(8192).decode()
+            for i in dirstr.split(','):
+                print(i)
 
 if __name__ == "__main__":
 	main() 

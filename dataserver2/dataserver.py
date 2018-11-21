@@ -25,7 +25,6 @@ def recvTh(soc):
             soc.sendall(pickle.dumps(dirlist))
 
 def main():
-    print()
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
     s.connect((hostIp, port))
     #connection confirmation
