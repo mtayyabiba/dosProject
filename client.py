@@ -1,10 +1,10 @@
 import socket as sc
 import threading           
-import os,pickle
+import os
+import myeditor as me
 
 port = 6969
 hostIp = '127.0.0.1'
-
 def listcmds():
     print("1. dirlist : get directory listing \n")
     print("2. readfile : get file in read only mode\n")
@@ -20,7 +20,15 @@ def listcmds():
 #            for i in dirdict[f]:
 #                print(i)
 
+def readFile(inputmsg, soc):
+    soc.sendall(inputmsg.encode('utf-8'))
+    #print("waiting for file...\n")
+    rFileStr = soc.recv(8192).decode()
+    return rFileStr
+
 def main():
+    #commit_msg = me.edit(contents=filecont.encode('utf-8'))
+    #print(commit_msg)
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
     s.connect((hostIp, port)) 
     print(s.recv(1024).decode()) 
@@ -41,16 +49,20 @@ def main():
             s.close()
             os._exit(0)
         elif(cmd == "dirlist"):
-            s.sendall(cmd.encode('utf-8'))
+            s.sendall("dirlist".encode('utf-8'))
             print("waiting for directory listing...")
             dirstr= s.recv(8192).decode()
-            for i in dirstr.split(','):
-                print(i)
+            msglist = dirstr.split(",")
+            for items in msglist:
+                print(items.replace("/","",1))
         elif(cmd == "readfile"):
-            s.sendall(inputmsg.encode('utf-8'))
-            print("waiting for file...")
-            rFileStr = s.recv(8192).decode()
-            print(rFileStr)
+            print(readFile(inputmsg,s)+"\n")
+        elif(cmd == "updatefile"):
+            rFileCmd = inputmsg.replace(cmd,"readfile",1)
+            uFileStr = readFile(rFileCmd,s)
+            commit_msg = me.edit(contents=uFileStr.encode('utf-8'))
+            inputmsg1 = (inputmsg+" ").encode('utf-8')
+            s.sendall((inputmsg1+commit_msg))
 
 
 if __name__ == "__main__":

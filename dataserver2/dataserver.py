@@ -14,6 +14,7 @@ def list_files(startpath):
             listFiles.append(absPath)
         for f in files:
             listFiles.append('{}/{}'.format(absPath,f))
+    print(listFiles)
     return listFiles
         
 
@@ -29,8 +30,15 @@ def recvTh(soc):
             filepath= "root/"+msg.split(' ')[1]
             f = open(filepath)
             filecont = f.read()
-            print(filecont)
             soc.sendall(filecont.encode('utf-8'))
+            f.close()
+        elif cmd == "updatefile":
+            filename = msg.split(' ')[1]
+            filepath= "root/"+filename
+            fileCont = msg.replace(cmd+" "+filename+" ","",1)
+            f = open(filepath, 'w')
+            f.write(fileCont)
+            f.close()
 
 
 
