@@ -1,10 +1,11 @@
 import socket as sc
 import threading           
-import os
+import os, queue
 import myeditor as me
 
 port = 6969
 hostIp = '127.0.0.1'
+q = queue.Queue()
 def listcmds():
     print("1. dirlist : get directory listing \n")
     print("2. readfile : get file in read only mode\n")
@@ -13,17 +14,23 @@ def listcmds():
     print("5. mkfile : create new file\n")
 
 
-#def recvTh(soc):
-#    while 1:
-#        dirdict = pickle.loads(soc.recv(8192))
-#        for f in dirdict:
-#            for i in dirdict[f]:
-#                print(i)
+def recvTh(soc):
+    while 1:
+        msgFromserver = soc.recv(8192).decode()
+        if msgFromserver != "":
+            #print("dsConnS "+ msgFromDserver)
+            q.put(msgFromserver)
+        else:
+            print("Connection closed with server...Exiting program")
+            soc.close()
+            os._exit(0)
+            break
+        
 
-def readFile(inputmsg, soc):
+def sendRecv(inputmsg, soc):
     soc.sendall(inputmsg.encode('utf-8'))
     #print("waiting for file...\n")
-    rFileStr = soc.recv(8192).decode()
+    rFileStr = q.get()
     return rFileStr
 
 def main():
@@ -32,11 +39,11 @@ def main():
     s = sc.socket(sc.AF_INET, sc.SOCK_STREAM)               
     s.connect((hostIp, port)) 
     print(s.recv(1024).decode()) 
-    #try:
-    #    recvT = threading.Thread(target=recvTh,kwargs={'soc':s})
-    #    recvT.start()
-    #except:
-    #    print("Error: unable to start thread")
+    try:
+        recvT = threading.Thread(target=recvTh,kwargs={'soc':s})
+        recvT.start()
+    except:
+        print("Error: unable to start thread")
 
     while True:
         inputmsg = input(">")
@@ -51,18 +58,23 @@ def main():
         elif(cmd == "dirlist"):
             s.sendall("dirlist".encode('utf-8'))
             print("waiting for directory listing...")
-            dirstr= s.recv(8192).decode()
+            dirstr= q.get()
             msglist = dirstr.split(",")
             for items in msglist:
                 print(items.replace("/","",1))
         elif(cmd == "readfile"):
-            print(readFile(inputmsg,s)+"\n")
+            print("\n"+sendRecv(inputmsg,s))
         elif(cmd == "updatefile"):
-            rFileCmd = inputmsg.replace(cmd,"readfile",1)
-            uFileStr = readFile(rFileCmd,s)
-            commit_msg = me.edit(contents=uFileStr.encode('utf-8'))
-            inputmsg1 = (inputmsg+" ").encode('utf-8')
-            s.sendall((inputmsg1+commit_msg))
+            uFileStr = sendRecv(inputmsg,s)
+            if uFileStr != "Given filename not found":
+                commit_msg = me.edit(contents=uFileStr.encode('utf-8'))
+                inputmsg1 = (inputmsg+" ").encode('utf-8')
+                s.sendall((inputmsg1+commit_msg))
+            else:
+                print(uFileStr)
+        elif(cmd == "deletefile"):
+            print("\n"+sendRecv(inputmsg,s))
+
 
 
 if __name__ == "__main__":
