@@ -106,7 +106,6 @@ def clientConnS(soc):
                 FileCmd(msg,soc,msg,filename)
                 servPort = getFileServPort(filename)
                 globalFT[servPort].remove(filename)
-                print(globalFT)
             else:
                 soc.sendall("Given file is being edited and cannot be deleted".encode('utf-8'))
         elif cmd == "updatefile":

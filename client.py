@@ -74,6 +74,13 @@ def main():
                 print(uFileStr)
         elif(cmd == "deletefile"):
             print("\n"+sendRecv(inputmsg,s))
+        elif(cmd == "createfile"):
+            filename = inputmsglist[1]
+            f = open(filename,'w+')
+            commit_msg = me.edit(filename=filename)
+            inputmsg1 = (inputmsg+" ").encode('utf-8')
+            s.sendall((inputmsg1+commit_msg))
+            f.close()
 
 
 
