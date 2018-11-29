@@ -4,6 +4,11 @@ import threading
 import pickle, queue
 
 #1. filename cant contain commas
+#2. update help
+#3. replication
+#4. format clientConnS
+#5. format recvTh in dataserver.py
+#6. locks lagane hyn
 
 hostIp = '127.0.0.1'
 clientPort = 6969
@@ -12,24 +17,25 @@ clientList = {}
 dserverList = {}
 globalFT = {}
 writeDict = {}
+dServCost = {}
 buffSize = 8192
 q = queue.Queue()
+lock = threading.Lock()
 
-#get directory listing from data server
 def getdirlist(soc):
     soc.send("dirlist".encode('utf-8'))
     dirlist = pickle.loads(soc.recv(buffSize))
     socPort = soc.getpeername()[1]
-    globalFT[socPort] = dirlist
-    print(globalFT)
+    dServCost[socPort] = dirlist[-1]
+    globalFT[socPort] = dirlist[:-1]
 
-
+"""
 def refreshDirList():
     globalFT.clear()
     for keys in dserverList:
         soc = dserverList[keys][1]
         getdirlist(soc)
-
+"""
 
 def dsConnS(soc):
     #get initial directory listing 
@@ -39,12 +45,14 @@ def dsConnS(soc):
         msgFromDserver = soc.recv(buffSize).decode()
         socPeer = soc.getpeername()
         if msgFromDserver != "":
-            #print("dsConnS "+ msgFromDserver)
-            q.put(msgFromDserver)
+            q.put(msgFromDserver) 
         else:
             print("connection closed with ",socPeer[0],":",socPeer[1])
+            #
             del dserverList[socPeer[1]]
             del globalFT[socPeer[1]]
+            del dServCost[socPeer[1]]
+            #
             soc.close()
             break
         
@@ -61,14 +69,13 @@ def dSListen():
             dsConn.send(b'Connection established with name server')
             dsThreads = []
             try:
-                
                 dsConnT = threading.Thread(target=dsConnS,kwargs={'soc':dsConn})
                 dsThreads.append(dsConnT)
                 dsConnT.start()
             except:
                 print("Error: unable to start thread")
 
-def getFileServPort(filename):
+def getFileServPort(filename):   
     for f in globalFT:
         for i in globalFT[f]:
             if i== filename:
@@ -80,15 +87,17 @@ def clientConnS(soc):
     msg = ""
     while True:
         msg = soc.recv(1024).decode()
-        print(msg)
-        cmd = msg.split(' ')[0]
+        #print(msg)
+        msglist = msg.split(' ')
+        cmd = msglist[0]
         clientPort = soc.getpeername()[1]
-        if msg == "exit" or msg == "":
+        if cmd == "exit" or cmd == "":
             print("connection closed with ",soc.getpeername()[0],":",clientPort)
+            #
             del clientList[clientPort]
             soc.close()
             break
-        elif msg == "dirlist":
+        elif cmd == "dirlist":
             dirmsg = ""
             if len(globalFT)>0:
                 for keys in globalFT:
@@ -98,45 +107,86 @@ def clientConnS(soc):
                 dirmsg = "File table is empty"
             soc.sendall(dirmsg.replace(",","",1).encode('utf-8'))
         elif cmd == "readfile":
-            filename = "/"+msg.split(' ')[1]
-            FileCmd(msg,soc,msg,filename)
-        elif cmd == "deletefile":
-            filename = "/"+msg.split(' ')[1]
+            filename = "/"+msglist[1]
+            FileCmd(msg,soc,filename)
+        elif cmd == "deletefile" or cmd == "deletefolder":
+            filename = "/"+msglist[1]
             if filename not in writeDict.values():
-                FileCmd(msg,soc,msg,filename)
-                servPort = getFileServPort(filename)
-                globalFT[servPort].remove(filename)
+                FileCmd(msg,soc,filename)
             else:
                 soc.sendall("Given file is being edited and cannot be deleted".encode('utf-8'))
+        elif cmd == "createfile" or cmd == "createfolder":
+            filename = "/"+msglist[1]
+            fileCheck = getFileServPort(filename)
+            if fileCheck == 0:#file not exists already
+                servPort = getMinServPort(filename)
+                print("min serv port ",servPort)
+                servSock = dserverList[servPort][1]
+                servSock.sendall(msg.encode('utf-8'))
+                msgq = q.get()
+                soc.sendall(msgq.encode('utf-8'))
+                if msgq.split(' ')[0] == "Created":
+                    globalFT[servPort].append(filename)
+                    if cmd == "createfile":
+                        dServCost[servPort] = dServCost[servPort]+1
+            else:#file already exists and cant be created
+                soc.sendall("Error! Given name already exists in listing".encode('utf-8'))
         elif cmd == "updatefile":
-            filename = "/"+msg.split(' ')[1]
+            filename = "/"+msglist[1]
             writeDict[clientPort] = filename
+            #first reading file contents from data server
             rFileCmd = msg.replace(cmd,"readfile",1) #cmd to read file content from dserver
             servPort = getFileServPort(filename)
             if servPort > 0:
                 print("file found on server ",servPort)
-                servSock = dserverList[servPort]
-                servSock[1].sendall(rFileCmd.encode('utf-8'))
+                servSock = dserverList[servPort][1]
+                servSock.sendall(rFileCmd.encode('utf-8'))
                 msgq = q.get()
+                #file contents or error sent to client
                 soc.sendall(msgq.encode('utf-8'))
-                updatedContent = soc.recv(buffSize).decode()
-                servSock[1].sendall(updatedContent.encode('utf-8'))
+                #if no error then get updated contents from client and send to dataserver
+                if msgq != "Error! Given filename is a folder":
+                    updatedContent = soc.recv(buffSize).decode()
+                    servSock.sendall(updatedContent.encode('utf-8'))
             elif servPort == 0:
-                soc.sendall("Given filename not found".encode('utf-8'))
+                soc.sendall("Error! Given filename not found".encode('utf-8'))
             del writeDict[clientPort]
             
 
+def getMinServPort(filename):
+    #if first folder already exists then redirect to that server
+    folder1 = filename.split('/')[1]
+    servPort = getFileServPort("/"+folder1)
+    print(servPort)
+    if servPort >0:
+        return servPort
+    else:
+    #else find server with min cost and create file there
+        minCost = min(dServCost.values())
+        for key, value in dServCost.items():
+            if value == minCost:
+                return key
 
-def FileCmd(msg,soc,readmsg,filename):
+
+
+
+def FileCmd(msg,soc,filename):
     servPort = getFileServPort(filename)
+    cmd = msg.split(' ')[0]
     if servPort > 0:
         print("file found on server ",servPort)
-        servSock = dserverList[servPort]
-        servSock[1].sendall(readmsg.encode('utf-8'))
+        #
+        servSock = dserverList[servPort][1]
+        servSock.sendall(msg.encode('utf-8'))
         msgq = q.get()
         soc.sendall(msgq.encode('utf-8'))
+        if msgq.split(' ')[0] == "Deleted":
+            globalFT[servPort].remove(filename)
+            if cmd == "deletefile":
+                dServCost[servPort] = dServCost[servPort]-1
+        #
     elif servPort == 0:
-        soc.sendall("Given filename not found".encode('utf-8'))
+        soc.sendall("Error! Given filename not found".encode('utf-8'))
 
 def clientListen():
     with sc.socket(sc.AF_INET, sc.SOCK_STREAM) as masterCSocket:
@@ -147,7 +197,9 @@ def clientListen():
             clientConn, clientAddr = masterCSocket.accept()      
             print ('Got client connection from', clientAddr[0],":",clientAddr[1] )
             #print("clientConn is ", clientConn)
+            #
             clientList[clientAddr[1]] = [clientAddr[0],clientConn]
+            #
             #sending connection confirmation
             clientConn.send(b'Connection established with name server')
             clientThreads = []
